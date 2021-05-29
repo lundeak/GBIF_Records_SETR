@@ -1,0 +1,438 @@
+---
+title: "SETR_JAVU_TYJA_datagather"
+author: "Lundeak"
+date: "September 24, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "<filepath>") ## Work Comp
+```
+
+
+#Load Packages 
+
+```{r Packages, warning=FALSE, message = FALSE}
+#install.packages('rgbif')
+#install.packages('png')
+
+
+library(ggplot2)
+library(tidyverse)
+
+library(rgbif)
+library(png)
+#library(RColorBrewer)
+#library(grid)
+#library(viridis)
+
+#help(rgbif)
+
+```
+
+## Data read-in
+
+Reading in each csv from Data Directory
+
+```{r Dataframe creation}
+atlas.obs <- read.csv('Data/SenecioJacobaea_WithFuzz_20190828.csv') # Source: OR Atlas (T Jaster)
+# includes both JAVU and SETR records
+
+# JAVU ####
+
+jv.edd <- read.csv('Data/JAVU/JAVU_edd_or.csv') # source: EDD Maps 
+jv.oda <- read.csv('Data/JAVU/JAVU_ODA_WeedMapper_v2.csv') # Source: ODA Weedmapper
+
+jv.atl <- atlas.obs[atlas.obs$taxon == 'Senecio jacobaea',]
+jv.gbf <- read.csv('Data/JAVU/JAVU_gbif_or.csv')
+
+# SETR ####
+
+
+levels(atlas.obs$taxon)
+st.atl <- atlas.obs[atlas.obs$taxon %in% c('Senecio triangularis',
+                                           'Senecio triangularis var. angustifolius',
+                                           'Senecio triangularis var. triangularis'),]
+
+st.gbif <- read.csv('Data/SETR/SETR_gbif_or.csv')
+
+
+# TYJA ####
+
+tj.oda <- read.csv('Data/TYJA/TYJA_release_ODA_v19.csv')
+tj.gbif <- read.csv('Data/TYJA/TYJA_gbif_or.csv')
+tj.bmna <- read.csv('Data/TYJA/TYJA_bamona_oregon.csv')
+
+
+```
+
+## Explore/clean for Combining
+
+
+
+```{r Dataframe explore, JAVU}
+
+# JAVU EDD ####
+names(jv.edd)
+
+# How many obs have data for "dateacc"
+unique(jv.edd$dateacc) # all entries: 'NA'
+
+# How many obs have data for "coordacc"
+nrow(subset(jv.edd, is.na(coordacc)==T))
+# 14163 obs do not have coordacc
+table(jv.edd$coordacc)
+# 16 obs do have coordacc at 0, 5, or 10 (presumably meters?)
+
+levels(jv.edd$verified)
+jv.edd[is.na(jv.edd$verified)==T,] # all 'verified'
+
+str(jv.edd)
+# eliminate columns containing no information
+nrow(subset(jv.edd, is.na(orgsrcid)==F))
+nrow(subset(jv.edd, is.na(pid)==F))
+nrow(subset(jv.edd, is.na(voucher)==F))
+nrow(subset(jv.edd, is.na(museum)==F))
+nrow(subset(jv.edd, is.na(museumrec)==F))
+nrow(subset(jv.edd, is.na(reference)==F))
+nrow(subset(jv.edd, is.na(host_name)==F))
+nrow(subset(jv.edd, is.na(host)==F))
+nrow(subset(jv.edd, is.na(surveyor)==F))
+nrow(subset(jv.edd, is.na(visittype)==F))
+nrow(subset(jv.edd, is.na(numtraps)==F))
+nrow(subset(jv.edd, is.na(traptype)==F))
+nrow(subset(jv.edd, is.na(quantityu)==F))
+nrow(subset(jv.edd, is.na(treatcomm)==F))
+nrow(subset(jv.edd, is.na(treatarea)==F))
+nrow(subset(jv.edd, is.na(percentcov)==F))
+nrow(subset(jv.edd, is.na(numcollect)==F))
+nrow(subset(jv.edd, is.na(abundance)==F))
+nrow(subset(jv.edd, is.na(grossacre)==F)) # 51 entries (of 14179)
+nrow(subset(jv.edd, is.na(locality)==F))
+nrow(subset(jv.edd, is.na(habitat)==F))
+nrow(subset(jv.edd, is.na(localowner)==F))
+nrow(subset(jv.edd, is.na(dateacc)==F))
+names(jv.edd)
+jv.edd <- jv.edd[ , !(names(jv.edd) %in% c('orgsrcid',
+                     'pid',
+                     'voucher',
+                     'museum',
+                     'museumrec',
+                     'reference',
+                     'host_name',
+                     'host',
+                     'surveyor',
+                     'visittype',
+                     'numtraps',
+                     'traptype',
+                     'quantityu',
+                     'quantity',
+                     'treatcomm',
+                     'treatarea',
+                     'percentcov',
+                     'numcollect',
+                     'abundance',
+                     'grossacre',
+                     'locality',
+                     'habitat',
+                     'localowner',
+                     'dateacc'
+                      ))]
+names(jv.edd)
+levels(jv.edd$reviewer)
+levels(jv.edd$reviewdate)
+levels(jv.edd$verifymthd)
+levels(jv.edd$idcred)
+levels(jv.edd$occstatus)
+levels(jv.edd$sciname)
+levels(jv.edd$comname)
+
+names(jv.edd) <- c(names(jv.edd)[1],'observer','organization','common.name','latin.name',
+                   'occstatus','date.obs','date.submitted','dateup',names(jv.edd)[10:13],
+                   'spatial.accuracy',names(jv.edd)[15],'accuracy.comment',names(jv.edd)[17:33])
+# replaced below code with the code above
+#names(jv.edd)[names(jv.edd)=='X'] <- 'organization'
+#names(jv.edd)[names(jv.edd)=='comname'] <- 'common.name'
+#names(jv.edd)[names(jv.edd)=='sciname'] <- 'latin.name'
+#names(jv.edd)[names(jv.edd)=='obsdate'] <- 'date.obs'
+#names(jv.edd)[names(jv.edd)=='dateent'] <- 'date.submitted'
+#names(jv.edd)[names(jv.edd)=='coordacc'] <- 'spatial.accuracy'
+#names(jv.edd)[names(jv.edd)=='reporter'] <- 'observer'
+#names(jv.edd)[names(jv.edd)=='datatype'] <- 'accuracy.comment'
+
+jv.edd$spatial.accuracy <- factor(jv.edd$spatial.accuracy)
+
+jv.edd <- jv.edd%>%mutate(accuracy.comment = ifelse(accuracy.comment!='',
+                                                     as.character(accuracy.comment),as.character(method)))
+
+
+jv.edd$date.obs[jv.edd$date.obs==''] <- NA
+nrow(subset(jv.edd, is.na(date.obs))) # zero
+jv.edd$date.obs <- as.Date(jv.edd$date.obs, format='%m/%d/%Y')
+jv.edd$date.submitted <- as.Date(jv.edd$date.submitted, format='%d-%b-%y')
+#jv.edd <- jv.edd %>% mutate(source.of.dataset = 'EDD Maps')
+
+
+
+
+
+# JAVU ODA ####
+
+names(jv.oda)
+str(jv.oda)
+
+names(jv.oda)[names(jv.oda)=='x..of.plants']<-'number.of.plants'
+
+levels(jv.oda$organization)
+levels(jv.oda$source.of.dataset)
+
+nrow(subset(jv.oda, is.na(number.of.plants)==F)) #45 none-NA values
+
+names(jv.oda)
+names(jv.oda)[names(jv.oda) == 'genus...species'] <- 'latin.name' # rename to match jv.edd
+names(jv.oda)[names(jv.oda) == 'date.found'] <- 'date.obs' # rename to match jv.edd
+names(jv.oda)[names(jv.oda) == 'contact'] <- 'observer'
+
+class(jv.oda$date.submitted) # is Date object? no.
+#levels(jv.oda$date.submitted)
+#jv.oda$date.submitted[jv.oda$date.submitted == ''] <- NA # convert '' to NA
+jv.oda <- droplevels(jv.oda) # drop level ''
+jv.oda$date.submitted <- as.Date(jv.oda$date.submitted, format='%m/%d/%Y') # convert to Date object
+
+
+nrow(subset(jv.oda, is.na(date.submitted))) # 3879 lack date of submission
+nrow(subset(jv.oda, is.na(date.submitted)==F)) # 3879 have date of submission
+
+class(jv.oda$date.obs) #Is jv.oda$date.obs a date object? NO
+jv.oda$date.obs[jv.oda$date.obs == ''] <- NA # convert '' to NA
+jv.oda$date.obs <- as.Date(jv.oda$date.obs, format='%m/%d/%Y') # convert to Date object
+
+
+# Add attribute: year 
+jv.oda <- jv.oda%>%
+  mutate(year = format(jv.oda$date.obs, '%Y')) 
+jv.oda <- jv.oda%>%
+  mutate(spatial.accuracy = NA)
+jv.oda$spatial.accuracy <- factor(jv.oda$spatial.accuracy)
+
+
+names(jv.oda)
+names(jv.edd)
+unique(jv.edd$spatial.accuracy)
+
+intersect(unique(jv.edd$objectid) , unique(jv.oda$objectid)) # is objectid unique across both dataframes? YES.
+
+# JAVU ATLAS ####
+
+names(jv.atl)<-tolower(names(jv.atl))
+
+# standardize names
+names(jv.atl)[names(jv.atl) == 'foundwithin'] <- 'spatial.accuracy'
+names(jv.atl)[names(jv.atl) == 'taxon'] <- 'latin.name'
+names(jv.atl)[names(jv.atl) == 'common'] <- 'common.name'
+names(jv.atl)[names(jv.atl) == 'collector_observer'] <- 'observer'
+names(jv.atl)[names(jv.atl)=='type'] <- 'accuracy.comment'
+names(jv.atl)[names(jv.atl) == 'lat'] <- 'latitude'
+names(jv.atl)[names(jv.atl) == 'long'] <- 'longitude'
+
+# Fix dates missing info
+
+levels(jv.atl$date)
+jv.atl<-droplevels(jv.atl)
+jv.atl$date <- factor(jv.atl$date, levels=c(levels(jv.atl$date), '1 May 1951', '31 December 1928',
+                        '1 August 1963', '1 July 1955'))
+
+jv.atl$date[jv.atl$date == 'May 1951'] <- '1 May 1951'
+jv.atl$date[jv.atl$date == 'August 1963'] <- '1 August 1963'
+jv.atl$date[jv.atl$date == '1928'] <- '31 December 1928'
+jv.atl$date[jv.atl$date == 'July 1955'] <- '1 July 1955'
+jv.atl<-droplevels(jv.atl)
+
+jv.try <- jv.atl
+jv.atl$date <- as.Date(jv.atl$date, format='%d %B %Y')
+
+names(jv.atl)[names(jv.atl) == 'date'] <- 'date.obs'
+class(jv.atl$date.obs)
+#unique(jv.atl$date.obs)
+#unique(jv.edd$date.obs)
+#unique(jv.oda$date.obs)
+
+jv.atl <- jv.atl %>% 
+  mutate(organization = 'Oregon Flora Project')%>%
+  mutate(dataset = 'Oregon Flora Atlas')
+  
+
+names(jv.atl)
+
+# JAVU GBIF####
+
+names(jv.gbf)<-tolower(names(jv.gbf))
+jv.gbf <- jv.gbf%>%mutate(common.name = 'tansy ragwort')
+jv.gbf <- jv.gbf%>%mutate(dataset = 'gbif')
+jv.gbf <- jv.gbf%>%select(species, common.name,
+                            decimallatitude, decimallongitude,
+                            coordinateuncertaintyinmeters, informationwithheld, locality, 
+                            verbatimlocality,  eventdate, month, day, year, 
+                            institutioncode, dataset, recordedby, geodeticdatum, everything() )
+
+jv.gbf <- filter(jv.gbf, coordinateuncertaintyinmeters<20000)
+jv.gbf <- jv.gbf %>% rename(latin.name = species,
+                              latitude = decimallatitude,
+                              longitude = decimallongitude,
+                              spatial.accuracy = coordinateuncertaintyinmeters,
+                              datetime = eventdate,
+                              organization = institutioncode,
+                              observer = recordedby,
+                              datum = geodeticdatum)
+
+
+jv.gbf <- jv.gbf %>% mutate(locality = ifelse(is.na(locality)==T, as.character(verbatimlocality), 
+                                                as.character(locality)))
+
+nrow(subset(jv.gbf, is.na(informationwithheld)==F)) # now empty
+
+#names(jv.gbf)
+jv.gbf <- jv.gbf%>%select(latin.name, common.name, latitude, longitude, 
+                            spatial.accuracy, locality, datetime, date.obs, year, organization,
+                            dataset, observer, datum, everything())
+
+jv.gbf$spatial.accuracy <- as.character(jv.gbf$spatial.accuracy)
+
+class(jv.gbf$datetime)
+head(jv.gbf$datetime)
+jv.gbf$datetime <- as.character(jv.gbf$datetime)
+jv.gbf <- jv.gbf%>%mutate(date.obs = substr(datetime, 1,10))
+jv.gbf$date.obs <- as.Date(jv.gbf$date.obs)
+
+levels(jv.gbf$informationwithheld)
+# Arrange/rename common attributes####
+jv.oda <- jv.oda%>%mutate(dataset = 'ODA WeedMapper')
+jv.edd <- jv.edd%>%mutate(dataset = 'EDD Maps')
+
+
+jv.oda <- jv.oda%>%select(latin.name, common.name, 
+                          latitude, longitude, spatial.accuracy,
+                          date.obs, date.submitted, year, organization, 
+                          dataset, everything())
+
+jv.edd <- jv.edd%>%select(latin.name, common.name, 
+                          latitude, longitude, spatial.accuracy,
+                          date.obs, date.submitted, year, organization,
+                          dataset, everything())
+
+jv.atl <- jv.atl%>%select(latin.name, common.name, latitude,
+                          longitude, spatial.accuracy, date.obs,
+                          year, organization, dataset, everything())
+
+jv.edd <- jv.edd%>%select(-dateup, -occstatus, -method, -recsource,
+                          -density, -origname, -nativity, -collecttme,
+                          -recsrctyp, -idcred, -verified, -oregon
+                          )
+jv.oda <- jv.oda%>%select(-address, -oswb.grant.., -oda.classification,
+                          -unique.id.code, -x, -y)
+
+jv.atl <- jv.atl%>%select(-mappable, -family, -taxonauths)
+
+
+
+# Issue: not all entries for jv.oda have values for jv.oda$year
+class(jv.edd$year)
+class(jv.oda$year)
+#unique(jv.oda$year)
+jv.oda<-droplevels(jv.oda)
+nrow(subset(jv.oda, is.na(jv.oda$year)==T)) #818 entries have year =NA
+# All entries submitted prior to 2010
+# Will assign these entries a year using the year submitted (rather than found)
+
+jv.oda <- jv.oda %>% mutate(year = ifelse(is.na(date.obs)==F, format(jv.oda$date.obs, '%Y'),
+                                               format(jv.oda$date.submitted, '%Y')
+                                               ))
+    
+nrow(subset(jv.oda, is.na(jv.oda$year)==T)) # down to 387 entries
+subset(jv.oda, is.na(jv.oda$year)==T) # Clatsop SWCD Records, Mary Olson
+
+# WILL DROP THESE RECORDS
+
+jv.oda <- jv.oda[is.na(jv.oda$year)==F,]
+jv.oda$year <- as.integer(jv.oda$year)
+
+
+
+
+# Join EDD & ODA Datasets ####
+names(jv.edd)
+names(jv.oda)
+names(jv.atl)
+
+jv.full <- full_join(jv.edd, jv.oda, by=c('latin.name','common.name',
+                                         'latitude','longitude','spatial.accuracy',
+                                         'date.obs','year','organization',
+                                         'dataset','observer'))
+
+jv.full <- full_join(jv.full, jv.atl, by=c('latin.name','common.name',
+                                         'latitude','longitude','spatial.accuracy',
+                                         'date.obs','year','organization',
+                                         'dataset','observer'))
+
+jv.full2 <- full_join(jv.full, jv.gbf, by=c('latin.name','common.name',
+                                             'latitude','longitude','spatial.accuracy',
+                                             'date.obs','year','organization',
+                                             'dataset','observer'))
+
+```
+
+## Create histograms of frequency of observing JAVU by year, by dataset
+```{r Temporal Histograms, JAVU }
+
+unique(jv.full$year)
+unique(jv.full$dataset)
+
+jv.full$dataset <- factor(jv.full$dataset, levels = c('ODA WeedMapper', 'EDD Maps', 'Oregon Flora Atlas'))
+levels(jv.full$dataset)
+
+
+(hh <- ggplot(jv.full, aes(x=year, fill=dataset))+geom_histogram(position=position_dodge(),stat='bin'))
+(hh <- ggplot(jv.full, aes(x=year))+
+                geom_histogram(data=subset(jv.full, dataset=='EDD Maps'), fill='red', alpha=0.2)+
+                geom_histogram(data=subset(jv.full, dataset=='ODA WeedMapper'), fill='blue', alpha=0.2)+
+                geom_histogram(data=subset(jv.full, dataset=='Oregon Flora Atlas'), fill='green', alpha=0.2))
+
+# histogram of only Oregon Flora Atlas records
+(hh.atl <- ggplot(jv.full, aes(x=year, fill=dataset))+
+    geom_histogram(data=subset(jv.full, dataset=='Oregon Flora Atlas'))) 
+# shows that highest count for OR Flora Atlas is ~8 observations in a year.
+
+plot_multi_histogram <- function(df, feature, label_column) {
+    plt <- ggplot(df, aes(x=eval(parse(text=feature)), fill=eval(parse(text=label_column)))) +
+    geom_histogram(alpha=0.7, position="identity", #aes(y = ..density..), 
+                   color="black") +
+    #geom_density(alpha=0.7) +
+    scale_x_continuous(limits = c(1950,2020), breaks=c(seq(1950,2020,5)))+
+      scale_y_sqrt()+
+    #geom_vline(aes(xintercept=mean(eval(parse(text=feature)))), color="black", linetype="dashed", size=1) +
+    labs(x=feature, y = "Observation Ct")
+    plt + guides(fill=guide_legend(title=label_column))
+}
+
+
+plot_multi_histogram(jv.full, 'year', 'dataset')
+
+jv.atl$year
+
+
+unique(jv.full2$dataset)
+
+jv.full2$dataset <- factor(jv.full2$dataset, levels = c('ODA WeedMapper', 'EDD Maps', 'gbif','Oregon Flora Atlas'))
+levels(jv.full2$dataset)
+
+(h_javu <- plot_multi_histogram(jv.full2, 'year','dataset')+
+  ggtitle('Tansy Ragwort Observation Frequency'))
+
+
+#ggsave('plots/JAVU_obs_frequency_distn.png', h_javu,  width=8, height=5)
+
+```
+
+
+
